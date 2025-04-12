@@ -1,13 +1,19 @@
 import os
 import json
-from queue import PriorityQueue
+import time
 
-leftover_indices = PriorityQueue()
-index = 0
+index: int = 0
+
+class FileMetadata():
+    filename: str
+    file_path: str
+    last_modified: float
+    size: float
+    extension: str
 
 def build_virtual_file_system(root: str):
-    vfs_by_docId = {}
-    vfs_by_path = {}
+    vfs_by_docId: dict[int, FileMetadata] = {}
+    vfs_by_path: dict[str, int] = {}
     global index
 
     for dirpath, _, filenames in os.walk(root):
@@ -22,7 +28,7 @@ def build_virtual_file_system(root: str):
             vfs_by_docId[new_index] = {
                 "filename": filename,
                 "path": file_path,
-                "last-modified": file_stat.st_mtime,
+                "last_modified": file_stat.st_mtime,
                 "size": file_stat.st_size,
                 "extension": os.path.splitext(filename)[1]
             }
@@ -31,7 +37,7 @@ def build_virtual_file_system(root: str):
 
     return vfs_by_docId, vfs_by_path
 
-def save_virtual_file_system(vfs):
+def save_virtual_file_system(vfs: tuple):
     global index
     with open("virtual_file_system.json", "w") as f:
         json.dump((index, vfs[0], vfs[1]), f, indent=4)
@@ -43,16 +49,28 @@ def load_virtual_file_system():
 
     return vfs_by_docId, vfs_by_path
 
-def update_virtual_file_system(root, vfs_by_docId, vfs_by_path):
+def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_by_path: dict[str, int]):
     global index
     for dirpath, _, filenames in os.walk(root):
         for filename in filenames:
             file_path = os.path.join(dirpath, filename)
             file_stat = os.stat(file_path)
 
-            if file_stat.st_mtime != vfs_by_docId[vfs_by_path[file_path]]["last-modified"]:
-                # status = leftover_indices.empty()
-                # new_index = str(leftover_indices.get() if not status else index)
+            if file_path not in vfs_by_path:
+                new_index = str(index)
+
+                vfs_by_path[file_path] = new_index
+
+                vfs_by_docId[new_index] = {
+                    "filename": filename,
+                    "path": file_path,
+                    "last_modified": file_stat.st_mtime,
+                    "size": file_stat.st_size,
+                    "extension": os.path.splitext(filename)[1]
+                }
+                
+                index += 1
+            elif file_stat.st_mtime != vfs_by_docId[vfs_by_path[file_path]]["last_modified"]:
                 new_index = vfs_by_path[file_path]
 
                 vfs_by_path[file_path] = new_index
@@ -60,20 +78,31 @@ def update_virtual_file_system(root, vfs_by_docId, vfs_by_path):
                 vfs_by_docId[new_index] = {
                     "filename": filename,
                     "path": file_path,
-                    "last-modified": file_stat.st_mtime,
+                    "last_modified": file_stat.st_mtime,
                     "size": file_stat.st_size,
                     "extension": os.path.splitext(filename)[1]
                 }
-                
-                # if not status:
-                #     index += 1
+    
+    for k in list(vfs_by_path.keys()):
+        if not os.path.exists(k):
+            del vfs_by_docId[vfs_by_path[k]]
+            del vfs_by_path[k]
 
 
-vfs_by_docId, vfs_by_path = build_virtual_file_system("data")
-save_virtual_file_system((vfs_by_docId, vfs_by_path))
+# t1 = time.time()
+# vfs_by_docId, vfs_by_path = build_virtual_file_system("data")
+# t2 = time.time()
+# print("Benchmark1:", t2 - t1)
+# save_virtual_file_system((vfs_by_docId, vfs_by_path))
 
-vfs_by_docId, vfs_by_path = load_virtual_file_system()
-update_virtual_file_system("data", vfs_by_docId, vfs_by_path)
+
+# vfs_by_docId, vfs_by_path = load_virtual_file_system()
+# t1 = time.time()
+# update_virtual_file_system("data", vfs_by_docId, vfs_by_path)
+# t2 = time.time()
+# print("Benchmark2:", t2 - t1)
+
+# update_virtual_file_system("data", vfs_by_docId, vfs_by_path)
 
 # from pprint import pprint
 # pprint(vfs_by_docId)
