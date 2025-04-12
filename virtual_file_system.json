@@ -1,0 +1,23 @@
+[
+    2,
+    {
+        "0": {
+            "filename": "file1.txt",
+            "path": "data\\file1.txt",
+            "last-modified": 1744476821.8523545,
+            "size": 4,
+            "extension": ".txt"
+        },
+        "1": {
+            "filename": "file2.txt",
+            "path": "data\\folder1\\file2.txt",
+            "last-modified": 1744476946.083139,
+            "size": 20,
+            "extension": ".txt"
+        }
+    },
+    {
+        "data\\file1.txt": "0",
+        "data\\folder1\\file2.txt": "1"
+    }
+]
