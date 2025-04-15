@@ -1,6 +1,7 @@
 import os
 import json
 import time
+from embeddings import encode_and_index, retrieve_closest_doc
 
 index: int = 0
 
@@ -21,6 +22,8 @@ def build_virtual_file_system(root: str):
             file_path = os.path.join(dirpath, filename)
             file_stat = os.stat(file_path)
             
+            encode_and_index(file_path, index)
+
             new_index = str(index)
 
             vfs_by_path[file_path] = new_index
@@ -44,10 +47,10 @@ def save_virtual_file_system(vfs: tuple):
 
 def load_virtual_file_system():
     global index
+    global vfs_by_docId
+    global vfs_by_path
     with open("virtual_file_system.json", "r") as f:
         index, vfs_by_docId, vfs_by_path = json.load(f)
-
-    return vfs_by_docId, vfs_by_path
 
 def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_by_path: dict[str, int]):
     global index
@@ -93,6 +96,8 @@ def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_
 # vfs_by_docId, vfs_by_path = build_virtual_file_system("data")
 # t2 = time.time()
 # print("Benchmark1:", t2 - t1)
+
+# vfs_by_docId, vfs_by_path = build_virtual_file_system("data")
 # save_virtual_file_system((vfs_by_docId, vfs_by_path))
 
 
@@ -109,3 +114,11 @@ def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_
 # print()
 # pprint(vfs_by_path)
 # print(index)
+
+vfs_by_docId, vfs_by_path = build_virtual_file_system("data")
+# load_virtual_file_system()
+t1 = time.time()
+result = retrieve_closest_doc("statistics", k=5)
+t2 = time.time()
+print(result)
+print("Benchmark3:", t2 - t1)
