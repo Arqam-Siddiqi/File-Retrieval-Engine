@@ -3,81 +3,225 @@ import faiss
 import numpy as np
 import nltk
 from nltk.tokenize import sent_tokenize
-from sentence_transformers import SentenceTransformer
+import torch
+from PIL import Image, UnidentifiedImageError
+import clip
 
-# Ensure sentence tokenizer is available
+# Download NLTK sentence splitter
 nltk.download('punkt', quiet=True)
-nltk.download('punkt_tab', quiet=True)
 
-def encode_and_index(filepath, doc_id, index_path="faiss_index.idx"):
+# --- Initialize CLIP components ---
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model_name = "openai/clip-vit-base-patch32"
+model, preprocess = clip.load("ViT-B/32", device=device)
+
+
+# ID offset for combining doc_id and segment index
+offset = 10**5
+
+
+def _load_or_create_index(index_path: str, dim: int) -> faiss.IndexIDMap:
     """
-    Read the file contents, split into sentences, encode them, and add the resulting embeddings to the FAISS index.
-    If an index file exists, merge the new embeddings; otherwise, create a new index.
+    Helper to load an existing FAISS IndexIDMap or create a new one.
+    Uses inner-product (IP) index for cosine similarity on normalized vectors.
+    """
+    if os.path.exists(index_path):
+        return faiss.read_index(index_path)
+    flat = faiss.IndexFlatIP(dim)
+    return faiss.IndexIDMap(flat)
+
+
+def encode_and_index_text(filepath: str, doc_id: int, index_path: str = "faiss_index.idx"):
+    """
+    Read a text file, split into sentences, encode with CLIP text encoder
+    (via the `clip` package), normalize embeddings, and add to a FAISS index.
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"The file {filepath} does not exist.")
 
+    # 1) Read & split
     with open(filepath, "r", encoding="utf-8") as f:
         text = f.read()
-
     sentences = sent_tokenize(text)
     if not sentences:
         raise ValueError("No sentences were extracted from the document.")
 
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    embeddings = model.encode(sentences, convert_to_numpy=True)
+    # 2) Encode under no_grad, detach, move to CPU & numpy
+    with torch.no_grad():
+        text_tokens = clip.tokenize(sentences).to(device)        # [N, token_len]
+        emb = model.encode_text(text_tokens)                     # torch.Tensor [N,512]
+        emb = emb.detach().cpu().numpy()                         # ndarray [N,512]
 
-    # Normalize for cosine similarity
-    embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+    # 3) L2‐normalize row‐wise
+    emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
 
-    embedding_dim = embeddings.shape[1]
-    OFFSET = 10 ** 5  
-    ids = np.array([doc_id * OFFSET + i for i in range(len(sentences))], dtype=np.int64)
+    # 4) Print (optional) & determine dim
+    dim = 512
+    print(f"[encode_text] embeddings shape: {emb.shape}")
 
-    if os.path.exists(index_path):
-        index = faiss.read_index(index_path)
-    else:
-        index_flat = faiss.IndexFlatIP(embedding_dim)
-        index = faiss.IndexIDMap(index_flat)
+    # 5) Build unique IDs for each sentence
+    ids = np.array([doc_id * offset + i for i in range(len(sentences))], dtype=np.int64)
 
-    index.add_with_ids(embeddings, ids)
+    # 6) Load or create FAISS index, add embeddings
+    index = _load_or_create_index(index_path, dim)
+    index.add_with_ids(emb, ids)
     faiss.write_index(index, index_path)
-    print(f"DocID {doc_id} has been indexed.")
 
-def retrieve_closest_doc(query_str, index_path="faiss_index.idx", k=1):
-    """
-    Compute cosine similarity between the input query and indexed sentence embeddings.
-    Return k distinct docIds with their similarity scores as list of (docId, score) tuples.
-    """
-    OFFSET = 10 ** 5
+    print(f"Indexed text DocID {doc_id} ({len(sentences)} segments) → {index_path}")
 
+
+def encode_and_index_image(image_input, doc_id: int, index_path: str = "faiss_index.idx"):
+    """
+    Read an image file path or PIL Image, encode with CLIP vision encoder,
+    normalize embeddings, and add to the shared FAISS index.
+    """
+    if isinstance(image_input, str):
+        if not os.path.exists(image_input):
+            raise FileNotFoundError(f"The image {image_input} does not exist.")
+        try:
+            image = Image.open(image_input).convert("RGB")
+        except UnidentifiedImageError:
+            raise ValueError(f"File at {image_input} is not a valid image.")
+    elif isinstance(image_input, Image.Image):
+        image = image_input.convert("RGB")
+    else:
+        raise ValueError("image_input must be a file path or PIL.Image object.")
+    
+    img_input = preprocess(image).unsqueeze(0).to(device)
+    with torch.no_grad():
+        emb = model.encode_image(img_input).detach().cpu().numpy()
+
+    # — normalize! —
+    emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    dim = 512
+    id = np.array([doc_id * offset], dtype=np.int64)
+
+    idx = _load_or_create_index(index_path, dim)
+    idx.add_with_ids(emb, id)
+    faiss.write_index(idx, index_path)
+    print(f"Indexed image DocID {doc_id} to {index_path}.")
+
+
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1):
+    """
+    Accepts a text string or image (file‑path or PIL.Image), encodes it
+    with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
+    searches your shared FAISS index. Returns a list of (doc_id, score).
+    """
+    # Determine modality
+    is_image = False
+    image = None
+    if isinstance(query, Image.Image):
+        is_image = True
+        image = query
+    elif isinstance(query, str) and os.path.exists(query):
+        try:
+            image = Image.open(query).convert("RGB")
+            is_image = True
+        except UnidentifiedImageError:
+            is_image = False
+
+    # Load index
     if not os.path.exists(index_path):
-        raise FileNotFoundError(f"The FAISS index file '{index_path}' does not exist.")
+        raise FileNotFoundError(f"Index file '{index_path}' not found.")
+    index: faiss.IndexIDMap = faiss.read_index(index_path)
 
+    # Encode query to a 512‑d numpy vector
+    if is_image:
+        img_input = preprocess(image).unsqueeze(0).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_image(img_input).cpu().numpy()
+    else:
+        tokens = clip.tokenize([query]).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_text(tokens).cpu().numpy()
+
+    q_emb = q_emb / np.linalg.norm(q_emb, axis=1, keepdims=True)
+
+    search_k = k * 100
+    distances, ids = index.search(q_emb, search_k)
+
+    results = []
+    if is_image:
+        # collapse each hit back to doc_id
+        for dist, idx in zip(distances[0], ids[0]):
+            if idx < 0: continue
+            doc_id = idx // offset
+            results.append((doc_id, float(dist)))
+            if len(results) == k:
+                break
+    else:
+        seen = set()
+        for dist, idx in zip(distances[0], ids[0]):
+            if idx < 0: continue
+            doc_id = idx // offset
+            if doc_id not in seen:
+                seen.add(doc_id)
+                results.append((doc_id, float(dist)))
+            if len(results) == k:
+                break
+
+    if not results:
+        raise ValueError("No results found for the given query.")
+    
+    results = list(map(lambda x : (int(x[0]), x[1]), results))
+
+    return results
+
+def delete_doc_vectors_batch(
+    doc_ids: list[int],
+    index_path: str = "faiss_index.idx",
+    offset: int = 10**5
+) -> dict[int, int]:
+    """
+    Delete all vectors for each `doc_id` in `doc_ids` from a FAISS IndexIDMap.
+
+    Vectors were originally added with IDs = doc_id * offset + segment_index.
+    Uses IDSelectorRange to avoid loading the entire id_map into Python.
+
+    Returns a dict mapping each doc_id to the number of vectors removed.
+    """
     index = faiss.read_index(index_path)
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    query_embedding = model.encode([query_str], convert_to_numpy=True)
-    query_embedding = query_embedding / np.linalg.norm(query_embedding, axis=1, keepdims=True)
+    if not hasattr(index, "id_map"):
+        raise ValueError("Index is not an IndexIDMap; cannot remove by ID.")
 
-    # Search for more to ensure we get enough distinct docIds
-    distances, ids = index.search(query_embedding, k * 10)
+    removed_counts: dict[int, int] = {}
+    total_before = index.ntotal
 
-    # Decode to docIds and filter for unique ones
-    seen = set()
-    result = []
-    for i, idx in enumerate(ids[0]):
-        if idx == -1:
-            continue
-        doc_id = idx // OFFSET
-        if doc_id not in seen:
-            seen.add(doc_id)
-            # Add tuple of (docId, score) where score is the distance (similarity)
-            result.append((int(doc_id), float(distances[0][i])))
-        if len(result) == k:
-            break
+    for doc_id in doc_ids:
+        imin = doc_id * offset
+        imax = (doc_id + 1) * offset
+        pre_ntotal = index.ntotal
 
-    if not result:
-        raise ValueError("No results found in the index for the given query.")
+        selector = faiss.IDSelectorRange(imin, imax)
+        index.remove_ids(selector)
 
-    return result
+        post_ntotal = index.ntotal
+        removed = pre_ntotal - post_ntotal
+        removed_counts[doc_id] = removed
 
+    faiss.write_index(index, index_path)
+
+    total_removed = total_before - index.ntotal
+    print(f"Removed a total of {total_removed} vectors across doc_ids={doc_ids}")
+    return removed_counts
+
+# from pprint import pprint
+# index = _load_or_create_index("faiss_index.idx", 512)
+# stored_ids = faiss.vector_to_array(index.id_map)
+# pprint(stored_ids)
+
+# tokens = clip.tokenize(["black cat playing with red ball in white background"]).to(device)
+# with torch.no_grad():
+#     q_emb = model.encode_text(tokens).cpu().numpy()
+# q_emb = q_emb / np.linalg.norm(q_emb, axis=1, keepdims=True)
+
+# # Encode image
+# img_input = preprocess(Image.open("data/images2.jpg").convert("RGB")).unsqueeze(0).to(device)
+# with torch.no_grad():
+#     img_emb = model.encode_image(img_input).cpu().numpy()
+# img_emb = img_emb / np.linalg.norm(img_emb, axis=1, keepdims=True)
+
+# similarity = float(np.dot(q_emb, img_emb.T)[0][0])
+# print("Direct similarity:", similarity)
