@@ -31,8 +31,7 @@ def extract_and_embed_pdf(file_path: str, doc_id: int):
             images.append(image)
 
     embed_text(all_text, doc_id)
-    for image in images:
-        embed_image(image, doc_id)
+    embed_image(images, doc_id)
 
 
 def extract_and_embed_doc(file_path: str, doc_id: int):
@@ -50,8 +49,7 @@ def extract_and_embed_doc(file_path: str, doc_id: int):
             images.append(image)
     
     embed_text(all_text, doc_id)
-    for image in images:
-        embed_image(image, doc_id)
+    embed_image(images, doc_id)
 
 
 def extract_and_embed(file_path: str, doc_id: int):

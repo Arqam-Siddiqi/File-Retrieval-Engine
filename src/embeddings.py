@@ -6,6 +6,7 @@ from nltk.tokenize import sent_tokenize
 import torch
 from PIL import Image, UnidentifiedImageError
 import clip
+from collections import defaultdict
 
 # Download NLTK sentence splitter
 # nltk.download('punkt', quiet=True)
@@ -45,6 +46,9 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
     if not sentences:
         raise ValueError("No sentences were extracted from the document.")
 
+    if len(sentences) > 0.9 * offset:
+        raise Exception(f"Only {0.9 * offset} sentences can be embedded.")
+
     # 2) Encode under no_grad, detach, move to CPU & numpy
     with torch.no_grad():
         text_tokens = clip.tokenize(sentences).to(device)        # [N, token_len]
@@ -56,11 +60,10 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
 
     # 4) Print (optional) & determine dim
     dim = 512
-    print(f"[encode_text] embeddings shape: {emb.shape}")
 
     # 5) Build unique IDs for each sentence
-    flag = 0
-    ids = np.array([(doc_id * offset + i) << 1 | flag for i in range(len(sentences))], dtype=np.int64)
+    # [100,000 - 190,000]
+    ids = np.array([doc_id * offset + i for i in range(len(sentences))], dtype=np.int64)
 
     # 6) Load or create FAISS index, add embeddings
     index = _load_or_create_index(index_path, dim)
@@ -70,7 +73,7 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
     print(f"Indexed text DocID {doc_id} ({len(sentences)} segments) → {index_path}")
 
 
-def embed_image(image_input, doc_id: int, index_path: str = "faiss_index.idx"):
+def embed_image(image_input: list[Image.Image] | str, doc_id: int, index_path: str = "faiss_index.idx"):
     """
     Read an image file path or PIL Image, encode with CLIP vision encoder,
     normalize embeddings, and add to the shared FAISS index.
@@ -78,33 +81,34 @@ def embed_image(image_input, doc_id: int, index_path: str = "faiss_index.idx"):
     if isinstance(image_input, str):
         if not os.path.exists(image_input):
             raise FileNotFoundError(f"The image {image_input} does not exist.")
-        try:
-            image = Image.open(image_input).convert("RGB")
-        except UnidentifiedImageError:
-            raise ValueError(f"File at {image_input} is not a valid image.")
-    elif isinstance(image_input, Image.Image):
-        image = image_input.convert("RGB")
-    else:
-        raise ValueError("image_input must be a file path or PIL.Image object.")
+        
+        image_input = [Image.open(image_input).convert("RGB")]
     
-    img_input = preprocess(image).unsqueeze(0).to(device)
-    with torch.no_grad():
-        emb = model.encode_image(img_input).detach().cpu().numpy()
+    if len(image_input) > 0.1 * offset:
+        raise Exception(f"Only {0.1 * offset} images can be embedded.")
+    
+    prepped = [preprocess(img) for img in image_input]
+    batch = torch.stack(prepped, dim=0).to(device)
 
-    # — normalize! —
-    emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+    # 4) Encode + normalize
+    with torch.no_grad():
+        emb = model.encode_image(batch)
+        emb = emb / emb.norm(dim=1, keepdim=True)
+    emb_np = emb.cpu().numpy()
 
     dim = 512
-    flag = 1
-    id = np.array([(doc_id * offset) << 1 | flag], dtype=np.int64)
 
-    idx = _load_or_create_index(index_path, dim)
-    idx.add_with_ids(emb, id)
-    faiss.write_index(idx, index_path)
-    print(f"Indexed image DocID {doc_id} to {index_path}.")
+    start = int(doc_id * offset + 0.9 * offset)
+    ids = np.arange(start, start + emb_np.shape[0], dtype=np.int64)
+
+    index = _load_or_create_index(index_path, dim)
+    index.add_with_ids(emb_np, ids)
+    faiss.write_index(index, index_path)
+
+    print(f"Indexed {emb_np.shape[0]} image(s) for doc_id={doc_id} into '{index_path}'.")
 
 
-def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 10):
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 3):
     """
     Accepts a text string or image (file‑path or PIL.Image), encodes it
     with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
@@ -147,26 +151,29 @@ def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1,
     seen = set()
     for dist, idx in zip(distances[0], ids[0]):
         if idx < 0: continue
-        flag = idx & 1
-        idx >>= 1
+
+        is_image_embedding = False
+        if (idx % offset) >= (0.9 * offset):
+            is_image_embedding = True
+
         doc_id = idx // offset
 
-        if (doc_id, flag) not in seen:
+        if (doc_id, is_image_embedding) not in seen:
             if doc_id in results:
                 score = float(dist)
-                if (is_image and flag == 0) or (not is_image and flag == 1):
+                if (is_image and not is_image_embedding) or (not is_image and is_image_embedding):
                     score *= balance_factor
                 
-                seen.add((doc_id, flag))                
+                seen.add((doc_id, is_image_embedding))                
                 results[doc_id] = max(results[doc_id], score)
             else:
                 score = float(dist)
-                if (is_image and flag == 0) or (not is_image and flag == 1):
+                if (is_image and not is_image_embedding) or (not is_image and is_image_embedding):
                     score *= balance_factor
                 results[doc_id] = score
         
-        if len(results) == k:
-            break
+        # if len(results) == k:
+        #     break
 
     if not results:
         raise ValueError("No results found for the given query.")
@@ -197,8 +204,8 @@ def delete_doc_embeddings(
     total_before = index.ntotal
 
     for doc_id in doc_ids:
-        imin = (doc_id * offset) << 1 | 0
-        imax = ((doc_id + 1) * offset) << 1 | 1
+        imin = doc_id * offset
+        imax = (doc_id + 1) * offset
         pre_ntotal = index.ntotal
 
         selector = faiss.IDSelectorRange(imin, imax)
@@ -218,20 +225,13 @@ def display_document_ids_in_vector_db():
     from pprint import pprint
     index = _load_or_create_index("faiss_index.idx", 512)
     stored_ids = faiss.vector_to_array(index.id_map)
-    stored_ids >>= 1
-    ids = list(set(map(lambda x : int(x) // 10**5, stored_ids)))
-    pprint(ids)
 
-# tokens = clip.tokenize(["black cat playing with red ball in white background"]).to(device)
-# with torch.no_grad():
-#     q_emb = model.encode_text(tokens).cpu().numpy()
-# q_emb = q_emb / np.linalg.norm(q_emb, axis=1, keepdims=True)
+    ids = defaultdict(lambda: {"images": 0, "text": 0})
+    for id in stored_ids:
+        reduced_id = int(id // offset)
+        if (id % offset) >= (0.9 * offset):
+            ids[reduced_id]["images"] += 1
+        else:
+            ids[reduced_id]["text"] += 1
 
-# # Encode image
-# img_input = preprocess(Image.open("data/images2.jpg").convert("RGB")).unsqueeze(0).to(device)
-# with torch.no_grad():
-#     img_emb = model.encode_image(img_input).cpu().numpy()
-# img_emb = img_emb / np.linalg.norm(img_emb, axis=1, keepdims=True)
-
-# similarity = float(np.dot(q_emb, img_emb.T)[0][0])
-# print("Direct similarity:", similarity)
+    pprint(dict(ids))

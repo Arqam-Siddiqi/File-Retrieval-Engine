@@ -145,7 +145,7 @@ if __name__ == "__main__":
     update_virtual_file_system("data", vfs_by_docId, vfs_by_path)
     save_virtual_file_system((vfs_by_docId, vfs_by_path))
 
-    result = retrieve_closest_doc("picture of a telephone", k=10)
+    result = retrieve_closest_doc("Pakistan", k=10)
     output = []
     for id, score in result:
         id = str(id)
