@@ -31,18 +31,17 @@ def _load_or_create_index(index_path: str, dim: int) -> faiss.IndexIDMap:
     return faiss.IndexIDMap(flat)
 
 
-def encode_and_index_text(filepath: str, doc_id: int, index_path: str = "faiss_index.idx"):
+def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"):
     """
     Read a text file, split into sentences, encode with CLIP text encoder
     (via the `clip` package), normalize embeddings, and add to a FAISS index.
     """
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"The file {filepath} does not exist.")
+    if os.path.exists(text_input):
+        with open(text_input, "r", encoding="utf-8") as f:
+            text_input = f.read()
 
     # 1) Read & split
-    with open(filepath, "r", encoding="utf-8") as f:
-        text = f.read()
-    sentences = sent_tokenize(text)
+    sentences = sent_tokenize(text_input)
     if not sentences:
         raise ValueError("No sentences were extracted from the document.")
 
@@ -71,7 +70,7 @@ def encode_and_index_text(filepath: str, doc_id: int, index_path: str = "faiss_i
     print(f"Indexed text DocID {doc_id} ({len(sentences)} segments) → {index_path}")
 
 
-def encode_and_index_image(image_input, doc_id: int, index_path: str = "faiss_index.idx"):
+def embed_image(image_input, doc_id: int, index_path: str = "faiss_index.idx"):
     """
     Read an image file path or PIL Image, encode with CLIP vision encoder,
     normalize embeddings, and add to the shared FAISS index.
@@ -105,7 +104,7 @@ def encode_and_index_image(image_input, doc_id: int, index_path: str = "faiss_in
     print(f"Indexed image DocID {doc_id} to {index_path}.")
 
 
-def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 2.7):
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 10):
     """
     Accepts a text string or image (file‑path or PIL.Image), encodes it
     with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
@@ -172,11 +171,12 @@ def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1,
     if not results:
         raise ValueError("No results found for the given query.")
     
-    results = list(map(lambda x : (int(x[0]), x[1]), results.items()))
+    results = [(int(k), v) for k, v in results.items()]
 
     return results
 
-def delete_doc_vectors_batch(
+
+def delete_doc_embeddings(
     doc_ids: list[int],
     index_path: str = "faiss_index.idx",
     offset: int = 10**5
@@ -197,8 +197,8 @@ def delete_doc_vectors_batch(
     total_before = index.ntotal
 
     for doc_id in doc_ids:
-        imin = doc_id * offset
-        imax = (doc_id + 1) * offset
+        imin = (doc_id * offset) << 1 | 0
+        imax = ((doc_id + 1) * offset) << 1 | 1
         pre_ntotal = index.ntotal
 
         selector = faiss.IDSelectorRange(imin, imax)
@@ -214,12 +214,13 @@ def delete_doc_vectors_batch(
     print(f"Removed a total of {total_removed} vectors across doc_ids={doc_ids}")
     return removed_counts
 
-from pprint import pprint
-index = _load_or_create_index("faiss_index.idx", 512)
-stored_ids = faiss.vector_to_array(index.id_map)
-stored_ids >>= 1
-ids = list(set(map(lambda x : int(x) // 10**5, stored_ids)))
-pprint(ids)
+def display_document_ids_in_vector_db():
+    from pprint import pprint
+    index = _load_or_create_index("faiss_index.idx", 512)
+    stored_ids = faiss.vector_to_array(index.id_map)
+    stored_ids >>= 1
+    ids = list(set(map(lambda x : int(x) // 10**5, stored_ids)))
+    pprint(ids)
 
 # tokens = clip.tokenize(["black cat playing with red ball in white background"]).to(device)
 # with torch.no_grad():
