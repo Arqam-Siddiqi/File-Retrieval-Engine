@@ -1,13 +1,18 @@
 import os
 import json
 import time
-from embeddings import encode_and_index_text, encode_and_index_image, retrieve_closest_doc, delete_doc_vectors_batch
+from embeddings import (
+    encode_and_index_text, 
+    encode_and_index_image, 
+    retrieve_closest_doc, 
+    delete_doc_vectors_batch
+)
 
 index: int = 0
 
 class FileMetadata():
     filename: str
-    file_path: str
+    path: str
     last_modified: float
     size: float
     extension: str
@@ -61,7 +66,7 @@ def load_virtual_file_system():
         vfs_by_path = {}
         index = 0
 
-def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_by_path: dict[str, int]):
+def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_by_path: dict[str, int | str]):
     global index
     for dirpath, _, filenames in os.walk(root):
         for filename in filenames:
@@ -104,7 +109,7 @@ def update_virtual_file_system(root, vfs_by_docId: dict[int, FileMetadata], vfs_
     docIds_to_delete = []
     for k in list(vfs_by_path.keys()):
         if not os.path.exists(k):
-            docIds_to_delete.append(vfs_by_path[k])
+            docIds_to_delete.append(int(vfs_by_path[k]))
             del vfs_by_docId[vfs_by_path[k]]
             del vfs_by_path[k]
 
@@ -119,12 +124,10 @@ load_virtual_file_system()
 update_virtual_file_system("data", vfs_by_docId, vfs_by_path)
 save_virtual_file_system((vfs_by_docId, vfs_by_path))
 
-result = retrieve_closest_doc("cat in white background", k=10)
+result = retrieve_closest_doc("images.jpg", k=10)
 output = []
 for id, score in result:
     id = str(id)
-    if vfs_by_docId[id]["filename"].endswith(('.jpg', '.jpeg', '.png')):
-        score = score * 3
     output.append((str(id), score))
 output.sort(key=lambda x: x[1], reverse=True)
 

@@ -8,7 +8,7 @@ from PIL import Image, UnidentifiedImageError
 import clip
 
 # Download NLTK sentence splitter
-nltk.download('punkt', quiet=True)
+# nltk.download('punkt', quiet=True)
 
 # --- Initialize CLIP components ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -60,7 +60,8 @@ def encode_and_index_text(filepath: str, doc_id: int, index_path: str = "faiss_i
     print(f"[encode_text] embeddings shape: {emb.shape}")
 
     # 5) Build unique IDs for each sentence
-    ids = np.array([doc_id * offset + i for i in range(len(sentences))], dtype=np.int64)
+    flag = 0
+    ids = np.array([(doc_id * offset + i) << 1 | flag for i in range(len(sentences))], dtype=np.int64)
 
     # 6) Load or create FAISS index, add embeddings
     index = _load_or_create_index(index_path, dim)
@@ -95,7 +96,8 @@ def encode_and_index_image(image_input, doc_id: int, index_path: str = "faiss_in
     emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
 
     dim = 512
-    id = np.array([doc_id * offset], dtype=np.int64)
+    flag = 1
+    id = np.array([(doc_id * offset) << 1 | flag], dtype=np.int64)
 
     idx = _load_or_create_index(index_path, dim)
     idx.add_with_ids(emb, id)
@@ -103,7 +105,7 @@ def encode_and_index_image(image_input, doc_id: int, index_path: str = "faiss_in
     print(f"Indexed image DocID {doc_id} to {index_path}.")
 
 
-def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1):
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 2.7):
     """
     Accepts a text string or image (file‑path or PIL.Image), encodes it
     with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
@@ -142,30 +144,35 @@ def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1)
     search_k = k * 100
     distances, ids = index.search(q_emb, search_k)
 
-    results = []
-    if is_image:
-        # collapse each hit back to doc_id
-        for dist, idx in zip(distances[0], ids[0]):
-            if idx < 0: continue
-            doc_id = idx // offset
-            results.append((doc_id, float(dist)))
-            if len(results) == k:
-                break
-    else:
-        seen = set()
-        for dist, idx in zip(distances[0], ids[0]):
-            if idx < 0: continue
-            doc_id = idx // offset
-            if doc_id not in seen:
-                seen.add(doc_id)
-                results.append((doc_id, float(dist)))
-            if len(results) == k:
-                break
+    results = {}
+    seen = set()
+    for dist, idx in zip(distances[0], ids[0]):
+        if idx < 0: continue
+        flag = idx & 1
+        idx >>= 1
+        doc_id = idx // offset
+
+        if (doc_id, flag) not in seen:
+            if doc_id in results:
+                score = float(dist)
+                if (is_image and flag == 0) or (not is_image and flag == 1):
+                    score *= balance_factor
+                
+                seen.add((doc_id, flag))                
+                results[doc_id] = max(results[doc_id], score)
+            else:
+                score = float(dist)
+                if (is_image and flag == 0) or (not is_image and flag == 1):
+                    score *= balance_factor
+                results[doc_id] = score
+        
+        if len(results) == k:
+            break
 
     if not results:
         raise ValueError("No results found for the given query.")
     
-    results = list(map(lambda x : (int(x[0]), x[1]), results))
+    results = list(map(lambda x : (int(x[0]), x[1]), results.items()))
 
     return results
 
@@ -207,10 +214,12 @@ def delete_doc_vectors_batch(
     print(f"Removed a total of {total_removed} vectors across doc_ids={doc_ids}")
     return removed_counts
 
-# from pprint import pprint
-# index = _load_or_create_index("faiss_index.idx", 512)
-# stored_ids = faiss.vector_to_array(index.id_map)
-# pprint(stored_ids)
+from pprint import pprint
+index = _load_or_create_index("faiss_index.idx", 512)
+stored_ids = faiss.vector_to_array(index.id_map)
+stored_ids >>= 1
+ids = list(set(map(lambda x : int(x) // 10**5, stored_ids)))
+pprint(ids)
 
 # tokens = clip.tokenize(["black cat playing with red ball in white background"]).to(device)
 # with torch.no_grad():
