@@ -108,7 +108,7 @@ def embed_image(image_input: list[Image.Image] | str, doc_id: int, index_path: s
     print(f"Indexed {emb_np.shape[0]} image(s) for doc_id={doc_id} into '{index_path}'.")
 
 
-def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 3):
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 3) -> list[tuple[int, float]]:
     """
     Accepts a text string or image (file‑path or PIL.Image), encodes it
     with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
@@ -183,6 +183,134 @@ def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1,
     return results
 
 
+def retrieve_closest_text(query, index_path: str = "faiss_index.idx", k: int = 1):
+    """
+    Accepts a text string or image (file‑path or PIL.Image), encodes it
+    with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
+    searches your shared FAISS index. 
+    Returns a list of (doc_id, score) tuples for text embeddings only.
+    """
+    # Determine modality
+    is_image = False
+    image = None
+    if isinstance(query, Image.Image):
+        is_image = True
+        image = query
+    elif isinstance(query, str) and os.path.exists(query):
+        try:
+            image = Image.open(query).convert("RGB")
+            is_image = True
+        except UnidentifiedImageError:
+            is_image = False
+
+    # Load index
+    if not os.path.exists(index_path):
+        raise FileNotFoundError(f"Index file '{index_path}' not found.")
+    index: faiss.IndexIDMap = faiss.read_index(index_path)
+
+    # Encode query to a 512‑d numpy vector
+    if is_image:
+        img_input = preprocess(image).unsqueeze(0).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_image(img_input).cpu().numpy()
+    else:
+        tokens = clip.tokenize([query]).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_text(tokens).cpu().numpy()
+
+    q_emb = q_emb / np.linalg.norm(q_emb, axis=1, keepdims=True)
+
+    search_k = k * 100
+    distances, ids = index.search(q_emb, search_k)
+
+    results = {}
+    for dist, idx in zip(distances[0], ids[0]):
+        if idx < 0: 
+            continue
+            
+        # Check if it's a text embedding (< 0.9 * offset)
+        if (idx % offset) < (0.9 * offset):
+            doc_id = idx // offset
+            if doc_id not in results:
+                results[doc_id] = float(dist)
+            else:
+                results[doc_id] = max(results[doc_id], float(dist))
+
+    if not results:
+        raise ValueError("No text results found for the given query.")
+    
+    # Convert to list of tuples and sort by score in descending order
+    results_list = [(int(doc_id), score) for doc_id, score in results.items()]
+    results_list.sort(key=lambda x: x[1], reverse=True)
+    
+    # Return only k results
+    return results_list[:k]
+
+
+def retrieve_closest_images(query, index_path: str = "faiss_index.idx", k: int = 1):
+    """
+    Accepts a text string or image (file‑path or PIL.Image), encodes it
+    with the CLIP model you loaded via `clip.load("ViT-B/32")`, then
+    searches your shared FAISS index. 
+    Returns a list of (doc_id, score) tuples for image embeddings only.
+    """
+    # Determine modality
+    is_image = False
+    image = None
+    if isinstance(query, Image.Image):
+        is_image = True
+        image = query
+    elif isinstance(query, str) and os.path.exists(query):
+        try:
+            image = Image.open(query).convert("RGB")
+            is_image = True
+        except UnidentifiedImageError:
+            is_image = False
+
+    # Load index
+    if not os.path.exists(index_path):
+        raise FileNotFoundError(f"Index file '{index_path}' not found.")
+    index: faiss.IndexIDMap = faiss.read_index(index_path)
+
+    # Encode query to a 512‑d numpy vector
+    if is_image:
+        img_input = preprocess(image).unsqueeze(0).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_image(img_input).cpu().numpy()
+    else:
+        tokens = clip.tokenize([query]).to(device)
+        with torch.no_grad():
+            q_emb = model.encode_text(tokens).cpu().numpy()
+
+    q_emb = q_emb / np.linalg.norm(q_emb, axis=1, keepdims=True)
+
+    search_k = k * 100
+    distances, ids = index.search(q_emb, search_k)
+
+    results = {}
+    for dist, idx in zip(distances[0], ids[0]):
+        if idx < 0: 
+            continue
+            
+        # Check if it's an image embedding (>= 0.9 * offset)
+        if (idx % offset) >= (0.9 * offset):
+            doc_id = idx // offset
+            if doc_id not in results:
+                results[doc_id] = float(dist)
+            else:
+                results[doc_id] = max(results[doc_id], float(dist))
+
+    if not results:
+        raise ValueError("No image results found for the given query.")
+    
+    # Convert to list of tuples and sort by score in descending order
+    results_list = [(int(doc_id), score) for doc_id, score in results.items()]
+    results_list.sort(key=lambda x: x[1], reverse=True)
+    
+    # Return only k results
+    return results_list[:k]
+
+
 def delete_doc_embeddings(
     doc_ids: list[int],
     index_path: str = "faiss_index.idx",
@@ -221,6 +349,7 @@ def delete_doc_embeddings(
     print(f"Removed a total of {total_removed} vectors across doc_ids={doc_ids}")
     return removed_counts
 
+
 def display_document_ids_in_vector_db():
     from pprint import pprint
     index = _load_or_create_index("faiss_index.idx", 512)
@@ -234,4 +363,6 @@ def display_document_ids_in_vector_db():
         else:
             ids[reduced_id]["text"] += 1
 
-    pprint(dict(ids))
+    # pprint(dict(ids))
+    return dict(ids)
+

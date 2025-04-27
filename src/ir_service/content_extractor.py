@@ -1,5 +1,5 @@
 import os
-from embeddings import (
+from src.ir_service.embeddings import (
     embed_text,
     embed_image
 )
