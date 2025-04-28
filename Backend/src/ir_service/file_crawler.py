@@ -9,6 +9,8 @@ from src.ir_service.content_extractor import (
     extract_and_embed
 )
 
+DOCUMENT_DIR = "../data/"
+
 # Global variables for virtual file system
 index: int = 0
 vfs_by_docId: dict[str, dict] = {}
@@ -75,7 +77,7 @@ def load_virtual_file_system():
         index = 0
 
 
-def update_virtual_file_system(root: str, whitelist: set[str] = None):
+def update_virtual_file_system(root: str = DOCUMENT_DIR, whitelist: set[str] = None):
     global index, vfs_by_docId, vfs_by_path
 
     if whitelist is None:
@@ -135,7 +137,7 @@ def update_virtual_file_system(root: str, whitelist: set[str] = None):
 if __name__ == "__main__":
 
     load_virtual_file_system()
-    update_virtual_file_system("data")
+    update_virtual_file_system(DOCUMENT_DIR)
     save_virtual_file_system()
 
     result = retrieve_closest_doc("Pakistan", k=10)

@@ -22,11 +22,14 @@ def ping():
 @app.get("/setup")
 def setup():
     load_virtual_file_system()
-    update_virtual_file_system("data")
+    update_virtual_file_system()
     save_virtual_file_system()
     
-    res = get_vfs()
-    return jsonify(res)
+    vfs_by_docId, vfs_by_path = get_vfs()
+    return jsonify({
+        "vfs_by_docId": vfs_by_docId, 
+        "vfs_by_path": vfs_by_path
+    })
 
 @app.get("/docs")
 def get_all_docs():
@@ -46,8 +49,12 @@ def search_docs(query):
     output.sort(key=lambda x: x[1], reverse=True)
     
     for id, score in output:
-        res[vfs_by_docId[str(id)]["filename"]] = score
+        res[score] = {
+            "filename": vfs_by_docId[str(id)]["filename"],
+            "path": vfs_by_docId[str(id)]["path"],
+            "extension": vfs_by_docId[str(id)]["extension"],
+        }
 
     json_data = json.dumps(res, indent=4, sort_keys=False)
-    
+
     return Response(json_data, mimetype='application/json')

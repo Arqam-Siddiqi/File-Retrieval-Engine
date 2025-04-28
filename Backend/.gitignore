@@ -1,0 +1,5 @@
+venv/
+data/
+virtual_file_system.json
+faiss_index.idx
+__pycache__/
