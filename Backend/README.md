@@ -15,9 +15,10 @@ A fast, efficient file search engine that indexes and ranks local files like Goo
 
 ### Clone the Repository
 ```sh
-git clone https://github.com/Arqam-Siddiqi/file-retrieval-engine.git
-cd file-retrieval-engine
+git clone https://github.com/Arqam-Siddiqi/File-Retrieval-Engine.git
+cd File-Retrieval-Engine
 ```
+
 ### Create a Virtual Environment
 ```sh
 python -m venv venv

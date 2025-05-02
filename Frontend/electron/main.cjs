@@ -1,51 +1,57 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const isDev = process.env.NODE_ENV === 'development';
+const url = require('url');
 
-// For file access security
-app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
-
+// Keep a global reference of the window object
 let mainWindow;
 
+
 function createWindow() {
+  // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1000,
+    width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.cjs'),
-    },
+      nodeIntegration: true,
+      contextIsolation: false
+    }
   });
 
-  // Load the Vite development server or the built HTML file
-  const startURL = isDev 
-    ? 'http://localhost:5173' 
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
-    
-  mainWindow.loadURL(startURL);
+  // Determine the correct URL to load
+  const startUrl = process.env.ELECTRON_START_URL || url.format({
+    pathname: path.join(__dirname, '../dist/index.html'),
+    protocol: 'file:',
+    slashes: true
+  });
+  
+  console.log("Loading URL:", startUrl);
+  
+  // Load the app
+  mainWindow.loadURL(startUrl);
 
-  // Open DevTools if in dev mode
-  if (isDev) {
+  // Open DevTools in development mode but suppress console noise
+  if (process.env.ELECTRON_START_URL) {
     mainWindow.webContents.openDevTools();
+    
+    // Optional: Filter out specific DevTools warnings
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+      if (message.includes('Autofill.') && message.includes('wasn\'t found')) {
+        event.preventDefault();
+      }
+    });
   }
 
-  mainWindow.on('closed', () => {
+  mainWindow.on('closed', function () {
     mainWindow = null;
   });
 }
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('activate', () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+app.on('activate', function () {
+  if (mainWindow === null) createWindow();
 });

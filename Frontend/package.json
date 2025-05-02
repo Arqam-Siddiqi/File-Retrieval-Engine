@@ -1,17 +1,16 @@
 {
-  "name": "file-retrieval-engine",
+  "name": "frontend",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8001 && cross-env ELECTRON_START_URL=http://localhost:8001 electron .\"",
     "electron:build": "npm run build && electron-builder",
-    "electron:preview": "npm run build && cross-env NODE_ENV=production electron ."
+    "electron:start": "electron ."
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -19,13 +18,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
-    "@types/node": "^22.15.3",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react-swc": "^3.8.0",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron": "^35.2.1",
+    "electron": "^36.1.0",
     "electron-builder": "^26.0.12",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -34,7 +32,21 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.26.1",
     "vite": "^6.3.1",
-    "vite-plugin-electron": "^0.29.0",
     "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.fileretrievalengine.app",
+    "productName": "File Retrieval Engine",
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "win": {
+      "target": "portable"
+    }
   }
 }
