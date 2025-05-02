@@ -1,16 +1,52 @@
+:root[data-theme="light"] {
+  --background-color: #f8f9fa;
+  --text-color: #213547;
+  --primary-color: #1a73e8;
+  --secondary-color: #1565c0;
+  --card-bg: #ffffff;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --input-border: #dfe1e5;
+  --muted-text: #5f6368;
+  --heading-color: #202124;
+  --theme-toggle-bg: #e0e0e0;
+  --theme-toggle-color: #202124;
+  --button-bg: #1a73e8;
+  --button-text: white;
+  --button-hover: #1565c0;
+  --error-color: #d93025;
+}
+
+:root[data-theme="dark"] {
+  --background-color: #202124;
+  --text-color: #e8eaed;
+  --primary-color: #8ab4f8;
+  --secondary-color: #aecbfa;
+  --card-bg: #2d2d2d;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.48);
+  --input-border: #5f6368;
+  --muted-text: #9aa0a6;
+  --heading-color: #e8eaed;
+  --theme-toggle-bg: #5f6368;
+  --theme-toggle-color: #e8eaed;
+  --button-bg: #8ab4f8;
+  --button-text: #202124;
+  --button-hover: #aecbfa;
+  --error-color: #f28b82;
+}
+
 :root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: #213547;
-  background-color: #f8f9fa;
+  
+  color: var(--text-color);
+  background-color: var(--background-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease;
 }
 
 a {
@@ -26,11 +62,13 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: 2.5em;
   line-height: 1.1;
+  color: var(--primary-color);
 }
 
 button {
@@ -40,12 +78,13 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--button-bg);
+  color: var(--button-text);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  background-color: var(--button-hover);
 }
 button:focus,
 button:focus-visible {

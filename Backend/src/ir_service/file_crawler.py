@@ -23,8 +23,11 @@ class FileMetadata:
     size: float
     extension: str
 
-def get_vfs():
+def get_vfs() -> tuple[dict[str, dict], dict[str, str]]:
     return vfs_by_docId, vfs_by_path
+
+def normalize_path(path: str) -> str:
+    return path.replace('\\', '/')
 
 def build_virtual_file_system(root: str, whitelist: set[str] = None):
     global index, vfs_by_docId, vfs_by_path
@@ -42,6 +45,7 @@ def build_virtual_file_system(root: str, whitelist: set[str] = None):
                 continue
 
             file_path = os.path.join(dirpath, filename)
+            file_path = normalize_path(file_path)
             file_stat = os.stat(file_path)
             
             extract_and_embed(file_path, index)
@@ -90,7 +94,8 @@ def update_virtual_file_system(root: str = DOCUMENT_DIR, whitelist: set[str] = N
             if ext not in whitelist:
                 continue
 
-            file_path: str = os.path.join(dirpath, filename)
+            file_path = os.path.join(dirpath, filename)
+            file_path = normalize_path(file_path)
             file_stat = os.stat(file_path)
 
             if file_path not in vfs_by_path:
