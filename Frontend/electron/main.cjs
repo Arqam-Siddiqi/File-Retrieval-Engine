@@ -1,10 +1,12 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const url = require('url');
 
 // Keep a global reference of the window object
 let mainWindow;
 
+// Suppress Electron warnings
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
 function createWindow() {
   // Create the browser window
@@ -12,8 +14,9 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -46,7 +49,21 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  
+  // Set up IPC handler for opening files
+  ipcMain.handle('open-file', async (event, filePath) => {
+    console.log('Opening file:', filePath);
+    try {
+      await shell.openPath(filePath);
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to open file:', err);
+      return { success: false, error: err.message };
+    }
+  });
+});
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();

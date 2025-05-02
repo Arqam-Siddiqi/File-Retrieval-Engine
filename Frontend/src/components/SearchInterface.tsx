@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import '../styles/SearchInterface.css';
 
+// Define the Electron API for TypeScript
+declare global {
+  interface Window {
+    electronAPI?: {
+      openFile: (filePath: string) => Promise<{ success: boolean, error?: string }>;
+    };
+  }
+}
+
 interface SearchResult {
   filename: string;
   path: string;
@@ -47,6 +56,21 @@ const SearchInterface = () => {
     }
   };
 
+  const handleOpenFile = async (filePath: string) => {
+    if (window.electronAPI) {
+      try {
+        const result = await window.electronAPI.openFile(filePath);
+        if (!result.success) {
+          console.error('Failed to open file:', result.error);
+        }
+      } catch (err) {
+        console.error('Error opening file:', err);
+      }
+    } else {
+      console.error('Electron API not available');
+    }
+  };
+
   return (
     <div className="search-container">
       <h1>File Retrieval Engine</h1>
@@ -77,7 +101,15 @@ const SearchInterface = () => {
             <h2>Search Results</h2>
             {Object.entries(results).map(([score, result], index) => (
               <div key={index} className="result-card">
-                <h3 className="file-name">{result.filename}</h3>
+                <div className="result-header">
+                  <h3 className="file-name">{result.filename}</h3>
+                  <button 
+                    className="open-button"
+                    onClick={() => handleOpenFile(result.path)}
+                  >
+                    Open
+                  </button>
+                </div>
                 <p className="file-path">Path: {result.path}</p>
                 <p className="file-type">Type: {result.extension.toUpperCase()}</p>
                 <p className="file-score">Relevance Score: {parseFloat(score).toFixed(4)}</p>
