@@ -322,7 +322,6 @@ h1 {
   width: 100%;
   /* Allow only 2 lines of text before truncating */
   display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

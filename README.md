@@ -2,7 +2,10 @@
 
 A powerful multimodal document search engine that allows you to find files using both text and image-based queries, packaged as a desktop application.
 
-![File Retrieval Engine](https://via.placeholder.com/800x450.png?text=File+Retrieval+Engine)
+<br/>
+<p align="center">
+  <img src="Frontend/public/logo5.png" alt="File Retrieval Engine" width="200">
+</p>
 
 ## Features
 
@@ -39,5 +42,5 @@ A powerful multimodal document search engine that allows you to find files using
 
 Clone the repository:
 ```bash
-git clone https://github.com/yourusername/File-Retrieval-Engine.git
+git clone https://github.com/Arqam-Siddiqi/File-Retrieval-Engine.git
 cd File-Retrieval-Engine
