@@ -17,6 +17,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 700,
+    title: "File Retrieval Engine",
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

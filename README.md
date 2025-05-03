@@ -1,0 +1,43 @@
+# File Retrieval Engine
+
+A powerful multimodal document search engine that allows you to find files using both text and image-based queries, packaged as a desktop application.
+
+![File Retrieval Engine](https://via.placeholder.com/800x450.png?text=File+Retrieval+Engine)
+
+## Features
+
+- **Text-based search** - Find documents by content using natural language queries
+- **Image-based search** - Use images to find visually similar documents
+- **Multimodal indexing** - Documents are indexed for both text content and visual elements
+- **Cross-platform desktop app** - Built with Electron to run on Windows, macOS, and Linux
+- **Real-time file monitoring** - Automatically indexes new and modified files
+- **Dark/light theme** - User-friendly interface that adapts to your preferences
+- **Open files directly** - One-click access to your search results
+
+## Technologies Used
+
+### Backend
+- **Python Flask** - Lightweight web server
+- **CLIP (Contrastive Language-Image Pre-training)** - Neural network for text and image embeddings
+- **FAISS** - Vector similarity search for efficient retrieval
+- **PyMuPDF & python-docx** - Document parsing for various file formats
+
+### Frontend
+- **React** - Modern UI framework
+- **TypeScript** - Type-safe JavaScript
+- **Electron** - Desktop application wrapper
+- **Vite** - Fast build tooling
+
+## Installation
+
+### Prerequisites
+- Python 3.8+ with pip
+- Node.js 18+ with npm
+- Git
+
+### Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/File-Retrieval-Engine.git
+cd File-Retrieval-Engine

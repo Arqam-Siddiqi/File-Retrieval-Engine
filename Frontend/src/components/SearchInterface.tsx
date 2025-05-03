@@ -137,9 +137,14 @@ const SearchInterface = () => {
 
   return (
     <div className="search-container">
-      <div className="app-title">
-        <h1>File Retrieval Engine</h1>
-        <p className="subtitle">Search by text or image</p>
+      <div className="app-header">
+        <div className="logo-container">
+          <img src="/logo5.png" alt="File Retrieval Engine Logo" className="app-logo" />
+        </div>
+        <div className="title-container">
+          <h1>File Retrieval Engine</h1>
+          <p className="subtitle">Search by text or image</p>
+        </div>
       </div>
       
       <div className="search-tabs">
