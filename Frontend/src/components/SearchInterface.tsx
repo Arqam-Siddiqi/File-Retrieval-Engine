@@ -10,10 +10,13 @@ declare global {
   }
 }
 
+// Update the SearchResult interface to include size and last_modified
 interface SearchResult {
   filename: string;
   path: string;
   extension: string;
+  size: number;
+  last_modified: number;
 }
 
 // Updated interface to reflect the new response format
@@ -25,7 +28,9 @@ const SearchInterface = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultsMap>({});
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [refreshMessage, setRefreshMessage] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +56,34 @@ const SearchInterface = () => {
       setResults({});
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshMessage('');
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:5000/refresh');
+      
+      if (!response.ok) {
+        throw new Error('Refresh failed. Please try again.');
+      }
+      
+      const data = await response.json();
+      setRefreshMessage(data.message || 'Index refreshed successfully');
+      // Clear previous results when refreshing
+      setResults({});
+    } catch (err) {
+      console.error('Refresh error:', err);
+      setError('Failed to refresh index. Is the backend server running?');
+    } finally {
+      setRefreshing(false);
+      // Auto-hide refresh message after 5 seconds
+      setTimeout(() => {
+        setRefreshMessage('');
+      }, 5000);
     }
   };
 
@@ -135,6 +168,29 @@ const SearchInterface = () => {
     }
   };
 
+  // Add these helper functions inside the SearchInterface component
+
+  // Format file size in bytes to human-readable format
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Format timestamp to readable date
+  const formatDate = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000); // Convert Unix timestamp to JavaScript Date
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <div className="search-container">
       <div className="app-header">
@@ -147,8 +203,53 @@ const SearchInterface = () => {
         </div>
       </div>
       
+      <div className="action-bar">
+        <button 
+          className={`refresh-button ${refreshing ? 'refreshing' : ''}`}
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <>
+              <span className="spinner"></span>
+              <span>Refreshing...</span>
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+              <span>Refresh Index</span>
+            </>
+          )}
+        </button>
+        
+        {refreshMessage && (
+          <p className="refresh-message success">{refreshMessage}</p>
+        )}
+      </div>
+      
       <div className="search-tabs">
         <div className="search-box">
+          {selectedImage && (
+            <div className="image-preview-chip">
+              <img 
+                src={imagePreview || ''} 
+                alt="Selected" 
+                className="image-chip-preview" 
+              />
+              <span>Image search</span>
+              <button 
+                className="chip-remove-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearImage();
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <input
             type="text"
             value={query}
@@ -160,58 +261,39 @@ const SearchInterface = () => {
               }
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search for files..."
-            className="search-input"
+            placeholder={selectedImage ? "" : "Search for files..."}
+            className={`search-input ${selectedImage ? 'with-image' : ''}`}
+            disabled={selectedImage !== null || refreshing}
+          />
+          <div className="image-button-container">
+            <button
+              className="image-upload-button"
+              onClick={handleImageUploadClick}
+              title="Search by image"
+              disabled={refreshing}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+            accept="image/*"
+            className="file-input"
+            disabled={refreshing}
           />
           <button 
-            onClick={handleSearch}
-            disabled={loading || !query.trim()}
+            onClick={selectedImage ? handleImageSearch : handleSearch}
+            disabled={loading || refreshing || (!query.trim() && !selectedImage)}
             className="search-button"
           >
             {loading ? 'Searching...' : 'Search'}
           </button>
-        </div>
-        
-        <div className="image-search-container">
-          <div className="image-upload-area" onClick={handleImageUploadClick}>
-            {imagePreview ? (
-              <div className="image-preview-container">
-                <img src={imagePreview} alt="Preview" className="image-preview" />
-                <button className="clear-image-btn" onClick={(e) => {
-                  e.stopPropagation();
-                  clearImage();
-                }}>✕</button>
-              </div>
-            ) : (
-              <>
-                <div className="upload-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
-                </div>
-                <p className="upload-text">Click to upload an image</p>
-              </>
-            )}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageChange}
-              accept="image/*"
-              className="file-input"
-            />
-          </div>
-          
-          {selectedImage && (
-            <button 
-              onClick={handleImageSearch}
-              disabled={loading}
-              className="search-button image-search-button"
-            >
-              {loading ? 'Searching...' : 'Search by Image'}
-            </button>
-          )}
         </div>
       </div>
       
@@ -223,19 +305,21 @@ const SearchInterface = () => {
             <h2>Search Results</h2>
             {Object.entries(results).flatMap(([score, resultList], scoreIndex) => 
               resultList.map((result, resultIndex) => (
-                <div key={`${scoreIndex}-${resultIndex}`} className="result-card">
+                <div 
+                  key={`${scoreIndex}-${resultIndex}`} 
+                  className="result-card"
+                  onClick={() => handleOpenFile(result.path)}
+                >
                   <div className="result-header">
                     <h3 className="file-name">{result.filename}</h3>
-                    <button 
-                      className="open-button"
-                      onClick={() => handleOpenFile(result.path)}
-                    >
-                      Open
-                    </button>
                   </div>
-                  <p className="file-path">Path: {result.path}</p>
-                  <p className="file-type">Type: {result.extension.toUpperCase()}</p>
-                  <p className="file-score">Relevance Score: {parseFloat(score).toFixed(4)}</p>
+                  <div className="file-details">
+                    <p className="file-path">{result.path}</p>
+                    <p className="file-type">Type: {result.extension.toUpperCase()}</p>
+                    <p className="file-size">Size: {formatFileSize(result.size)}</p>
+                    <p className="file-date">Modified: {formatDate(result.last_modified)}</p>
+                  </div>
+                  <p className="file-score">Score: {parseFloat(score).toFixed(4)}</p>
                 </div>
               ))
             )}

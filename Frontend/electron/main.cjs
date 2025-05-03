@@ -18,6 +18,7 @@ function createWindow() {
     width: 800,
     height: 700,
     title: "File Retrieval Engine",
+    icon: path.join(__dirname, '../public/logo5.png'), // Add this line
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

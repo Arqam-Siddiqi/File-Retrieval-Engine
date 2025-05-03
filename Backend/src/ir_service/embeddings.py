@@ -9,7 +9,7 @@ import clip
 from collections import defaultdict
 
 # Download NLTK sentence splitter
-# nltk.download('punkt', quiet=True)
+nltk.download('punkt', quiet=True)
 
 # --- Initialize CLIP components ---
 device = "cuda" if torch.cuda.is_available() else "cpu"

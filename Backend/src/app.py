@@ -23,16 +23,15 @@ CORS(app, origins="*")
 def ping():
     return jsonify(status="ok")
 
-@app.get("/setup")
+@app.get("/refresh")
 def setup():
     load_virtual_file_system()
     update_virtual_file_system()
     save_virtual_file_system()
     
-    vfs_by_docId, vfs_by_path = get_vfs()
     return jsonify({
-        "vfs_by_docId": vfs_by_docId, 
-        "vfs_by_path": vfs_by_path
+        "status": "ok",
+        "message": "Virtual file system loaded and updated successfully."
     })
 
 @app.get("/docs")
@@ -57,6 +56,8 @@ def search_docs(query):
             "filename": vfs_by_docId[str(id)]["filename"],
             "path": vfs_by_docId[str(id)]["path"],
             "extension": vfs_by_docId[str(id)]["extension"],
+            "size": vfs_by_docId[str(id)]["size"],
+            "last_modified": vfs_by_docId[str(id)]["last_modified"],
         })
 
     json_data = json.dumps(res, indent=4, sort_keys=False)
@@ -73,15 +74,13 @@ def search_by_image():
         return jsonify({"error": "No image selected"}), 400
     
     try:
-        # Read and convert the uploaded file to PIL Image
         image_bytes = image_file.read()
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         
-        # Get search results
         vfs_by_docId, _ = get_vfs()
         result = retrieve_closest_doc(img, k=6)
         print(result)
-        # Format response
+        
         res = defaultdict(list)
         output = []
         for id, score in result:
@@ -90,10 +89,12 @@ def search_by_image():
         
         for id, score in output:
             res[score].append({
-                "filename": vfs_by_docId[str(id)]["filename"],
-                "path": vfs_by_docId[str(id)]["path"],
-                "extension": vfs_by_docId[str(id)]["extension"],
-            })
+            "filename": vfs_by_docId[str(id)]["filename"],
+            "path": vfs_by_docId[str(id)]["path"],
+            "extension": vfs_by_docId[str(id)]["extension"],
+            "size": vfs_by_docId[str(id)]["size"],
+            "last_modified": vfs_by_docId[str(id)]["last_modified"],
+        })
         
         json_data = json.dumps(res, indent=4, sort_keys=False)
         return Response(json_data, mimetype='application/json')

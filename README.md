@@ -37,7 +37,7 @@ A powerful multimodal document search engine that allows you to find files using
 
 ### Setup
 
-1. Clone the repository:
+Clone the repository:
 ```bash
 git clone https://github.com/yourusername/File-Retrieval-Engine.git
 cd File-Retrieval-Engine
