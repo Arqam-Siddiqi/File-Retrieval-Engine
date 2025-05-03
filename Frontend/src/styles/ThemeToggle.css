@@ -17,12 +17,20 @@
   z-index: 999;
   padding: 0;
   transition: all 0.2s ease-in-out;
+  outline: none; /* Remove outline */
 }
 
 .theme-toggle:hover {
   transform: translateY(-2px);
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   color: var(--button-bg);
+}
+
+/* Add these styles to remove the orange focus border */
+.theme-toggle:focus,
+.theme-toggle:active {
+  outline: none;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 .theme-toggle svg {

@@ -645,12 +645,22 @@ h1 {
   align-items: center;
 }
 
+/* Base logo styling shared across themes */
 .app-logo {
   height: 90px;
   width: auto;
   transition: transform 0.3s ease;
-  border: 2px solid var(--input-border);
+  border: 2px solid;
   border-radius: 8px;
+}
+
+/* Theme-specific border colors */
+:root[data-theme="light"] .app-logo {
+  border-color: #000000; /* Black border for light mode */
+}
+
+:root[data-theme="dark"] .app-logo {
+  border-color: var(--input-border); /* Keep existing border for dark mode */
 }
 
 .app-logo:hover {

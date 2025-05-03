@@ -46,7 +46,14 @@
       "output": "release"
     },
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "public/logo5.png"
+    },
+    "mac": {
+      "icon": "public/logo5.png"
+    },
+    "linux": {
+      "icon": "public/logo5.png"
     }
   }
 }
