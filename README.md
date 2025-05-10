@@ -1,6 +1,7 @@
 # File Retrieval Engine
 
 A powerful multimodal document search engine that allows you to find files using both text and image-based queries, packaged as a desktop application.
+Text and images are extracted and used to generate embeddings using CLIP. These embeddings are then stored in FAISS for document querying based on similarity scores.
 
 <br/>
 <p align="center">
