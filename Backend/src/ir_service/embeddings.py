@@ -51,7 +51,7 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
 
     # 2) Encode under no_grad, detach, move to CPU & numpy
     with torch.no_grad():
-        text_tokens = clip.tokenize(sentences).to(device)        # [N, token_len]
+        text_tokens = clip.tokenize(sentences, truncate=True).to(device)        # [N, token_len]
         emb = model.encode_text(text_tokens)                     # torch.Tensor [N,512]
         emb = emb.detach().cpu().numpy()                         # ndarray [N,512]
 
@@ -70,7 +70,7 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
     index.add_with_ids(emb, ids)
     faiss.write_index(index, index_path)
 
-    print(f"Indexed text DocID {doc_id} ({len(sentences)} segments) → {index_path}")
+    print(f"Indexed {len(sentences)} sentences for docID={doc_id} → {index_path}")
 
 
 def embed_image(image_input: list[Image.Image] | str, doc_id: int, index_path: str = "faiss_index.idx"):
@@ -88,6 +88,9 @@ def embed_image(image_input: list[Image.Image] | str, doc_id: int, index_path: s
         raise Exception(f"Only {0.1 * offset} images can be embedded.")
     
     prepped = [preprocess(img) for img in image_input]
+    if not prepped:
+        print(f"Warning: Failed to preprocess any images for doc_id={doc_id}")
+        return
     batch = torch.stack(prepped, dim=0).to(device)
 
     # 4) Encode + normalize
@@ -108,7 +111,7 @@ def embed_image(image_input: list[Image.Image] | str, doc_id: int, index_path: s
     print(f"Indexed {emb_np.shape[0]} image(s) for doc_id={doc_id} into '{index_path}'.")
 
 
-def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 3) -> list[tuple[int, float]]:
+def retrieve_closest_doc(query, index_path: str = "faiss_index.idx", k: int = 1, balance_factor: float = 3.0) -> list[tuple[int, float]]:
     """
     Accepts a text string or image (file‑path or PIL.Image), encodes it
     with the CLIP model you loaded via `clip.load("ViT-B/32")`, then

@@ -260,6 +260,14 @@ h1 {
   color: var(--heading-color);
   font-size: 1.2em;
   grid-column: 1 / -1; /* Make the heading span all columns */
+  position: relative;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* For light mode, use a darker line */
+:root[data-theme="light"] .results-list h2 {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Document-style card with folded corner */
@@ -316,18 +324,18 @@ h1 {
 .file-name {
   margin: 0;
   color: var(--primary-color);
-  font-size: 18px; /* Increased from 16px */
+  font-size: 18px;
   font-weight: 600;
-  /* Allow the title to use full width */
   width: 100%;
-  /* Allow only 2 lines of text before truncating */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
   margin-bottom: 8px;
-  word-wrap: break-word;
   line-height: 1.3;
+  max-height: 2.6em;
+  white-space: normal !important;
 }
 
 .file-details {
@@ -341,12 +349,13 @@ h1 {
 .file-path {
   margin: 3px 0;
   color: var(--muted-text);
-  font-size: 13px; /* Increased from 12px */
+  font-size: 13px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: ellipsis !important;
+  white-space: nowrap; /* Keep as single line */
   padding-bottom: 5px;
   border-bottom: 1px dashed rgba(var(--primary-color-rgb), 0.1);
+  max-width: 100%;
 }
 
 .file-type, .file-size, .file-date {
@@ -649,8 +658,6 @@ h1 {
   height: 90px;
   width: auto;
   transition: transform 0.3s ease;
-  border: 2px solid;
-  border-radius: 8px;
 }
 
 /* Theme-specific border colors */
@@ -761,6 +768,46 @@ h1 {
   }
 }
 
+/* Update the refresh message styling to match theme colors */
+.refresh-message {
+  position: absolute;
+  left: 0;
+  font-size: 13px;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease-in-out;
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.refresh-message.success {
+  color: var(--primary-color); /* Use theme primary color instead of hardcoded green */
+  background-color: rgba(var(--primary-color-rgb), 0.12);
+  border-left: 3px solid var(--primary-color);
+}
+
+.refresh-message.error {
+  color: var(--error-color);
+  background-color: rgba(var(--error-color-rgb), 0.1);
+  border-left: 3px solid var(--error-color);
+}
+
+.refresh-message.fade-out {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .refresh-message {
   position: absolute;
   left: 0;
@@ -792,16 +839,225 @@ h1 {
   }
 }
 
-/* Adding this RGB value to the root variables for the error color */
-:root[data-theme="light"] {
-  --error-color-rgb: 217, 48, 37;
-}
-
-:root[data-theme="dark"] {
-  --error-color-rgb: 242, 139, 130;
-}
-
 .refresh-button:focus,
 .refresh-button:active {
   outline: none;
+}
+
+/* Override refresh message styling with !important */
+.refresh-message {
+  position: absolute !important;
+  left: 0 !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+  padding: 5px 10px !important;
+  border-radius: 4px !important;
+  animation: fadeIn 0.3s ease-in-out !important;
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out !important;
+  z-index: 5 !important; /* Ensure it's above other elements */
+}
+
+.refresh-message.success {
+  color: var(--primary-color) !important; /* Use theme color with important override */
+  background-color: rgba(var(--primary-color-rgb), 0.12) !important;
+  border-left: 3px solid var(--primary-color) !important;
+}
+
+.refresh-message.fade-out {
+  opacity: 0 !important;
+  transform: translateY(-10px) !important;
+  pointer-events: none !important;
+}
+
+.welcome-guide {
+  padding: 15px;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  max-width: 750px;
+  margin: 0 auto;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.welcome-guide h2 {
+  text-align: center;
+  color: var(--primary-color);
+  margin: 0 0 15px 0;
+  font-size: 1.3em;
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.guide-card {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: rgba(var(--primary-color-rgb), 0.03);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: default; /* Add this line to set the normal cursor */
+}
+
+.guide-card:hover {
+  background-color: rgba(var(--primary-color-rgb), 0.07);
+  transform: translateY(-2px);
+  cursor: default; /* Ensure it remains default on hover */
+}
+
+.guide-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(var(--primary-color-rgb), 0.1);
+  border-radius: 6px;
+  margin-right: 10px;
+  color: var(--primary-color);
+}
+
+.guide-content {
+  flex: 1;
+}
+
+.guide-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 1em;
+  color: var(--heading-color);
+}
+
+.guide-content p {
+  margin: 0;
+  font-size: 13px !important;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.guide-tip {
+  background-color: rgba(var(--primary-color-rgb), 0.05);
+  border-left: 3px solid var(--primary-color);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.guide-tip p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-color);
+}
+
+.welcome-guide {
+  padding: 10px 15px;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  max-width: 750px;
+  margin: 0 auto;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.welcome-guide h2 {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 20px;
+  font-size: 1.4em;
+}
+
+.guide-section {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed rgba(var(--primary-color-rgb), 0.2);
+}
+
+.guide-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 15px;
+}
+
+.guide-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(var(--primary-color-rgb), 0.1);
+  border-radius: 8px;
+  margin-right: 15px;
+  color: var(--primary-color);
+}
+
+.guide-content {
+  flex: 1;
+}
+
+.guide-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.1em;
+  color: var(--heading-color);
+}
+
+.guide-content p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color);
+  line-height: 1.5;
+}
+
+.guide-tip {
+  background-color: rgba(var(--primary-color-rgb), 0.05);
+  border-left: 3px solid var(--primary-color);
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+
+.guide-tip p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Add loading indicator styles */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(var(--primary-color-rgb), 0.2);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+.loading-container p {
+  color: var(--muted-text);
+  font-size: 14px;
 }

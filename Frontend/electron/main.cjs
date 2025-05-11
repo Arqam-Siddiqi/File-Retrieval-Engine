@@ -18,12 +18,14 @@ function createWindow() {
     width: 800,
     height: 700,
     title: "File Retrieval Engine",
-    icon: path.join(__dirname, '../public/logo5.png'), // Add this line
+    icon: path.join(__dirname, '../public/logo5.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
-    }
+    },
+    maximizable: false, // Disable maximize button
+    resizable: true // Keep resizable but prevent maximize
   });
 
   // Determine the correct URL to load
