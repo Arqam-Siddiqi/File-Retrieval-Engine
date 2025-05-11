@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "main": "electron/main.cjs",
   "scripts": {
+    "start": "cross-env ELECTRON_START_URL=http://localhost:8001 concurrently --kill-others \"vite\" \"wait-on http://localhost:8001 && electron .\"",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
