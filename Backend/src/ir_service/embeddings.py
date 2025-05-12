@@ -10,10 +10,10 @@ from collections import defaultdict
 
 # Download NLTK sentence splitter
 nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
 # --- Initialize CLIP components ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model_name = "openai/clip-vit-base-patch32"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
 
@@ -52,8 +52,8 @@ def embed_text(text_input: str, doc_id: int, index_path: str = "faiss_index.idx"
     # 2) Encode under no_grad, detach, move to CPU & numpy
     with torch.no_grad():
         text_tokens = clip.tokenize(sentences, truncate=True).to(device)        # [N, token_len]
-        emb = model.encode_text(text_tokens)                     # torch.Tensor [N,512]
-        emb = emb.detach().cpu().numpy()                         # ndarray [N,512]
+        emb = model.encode_text(text_tokens)                                    # torch.Tensor [N,512]
+        emb = emb.detach().cpu().numpy()                                        # ndarray [N,512]
 
     # 3) L2‐normalize row‐wise
     emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
